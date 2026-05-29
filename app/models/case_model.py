@@ -2,8 +2,15 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from datetime import datetime
 from app.models.user_model import User
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.ipc_model import IPCSection
 
 
+class CaseCreate(SQLModel):
+    title: str
+    description: str
 
 
 class Case(SQLModel, table=True):
@@ -28,6 +35,6 @@ class Case(SQLModel, table=True):
         back_populates="cases"
     )
 
-    # ipc_sections: List[IPCSection] = Relationship(
-    #     back_populates="cases",
-    # )
+    ipc_sections: List["IPCSection"] = Relationship(
+        back_populates="case"
+    )
