@@ -8,8 +8,7 @@ class BaseModel(SQLModel):
     # default_factory=uuid.uuid4:Every single time a new row is inserted, run this function fresh to generate a completely random, unique ID
     # Automatically sets the time when created
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        nullable=False
+        default_factory=lambda: datetime.now(timezone.utc)
     )
     # lambda: A function,executes fresh the exact split-second the row is saved to insert the current time in UTC.
     # Automatically updates this timestamp whenever the row is modified
@@ -17,12 +16,16 @@ class BaseModel(SQLModel):
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={
             "onupdate": lambda: datetime.now(timezone.utc)
-        },
-        nullable=False
+        }
     )
+    
 #sa_column_kwargs: sa: SQLAlchemy Column Keyword Arguments.
 # Take these key-value pairs and pass them directly down to the underlying SQLAlchemy Column constructor exactly as they are written. Do not alter them."
     is_deleted: bool =Field(
-        default=False,
-        nullable=False
+        default=False
      )
+    
+    deleted_at: datetime | None = Field(
+    default=None, 
+    sa_column_kwargs={"nullable": True}
+)
