@@ -2,7 +2,7 @@ import logging
 import json
 from groq import AsyncGroq
 from app.core.config import settings
-from app.models.schemas import CaseResponse
+from app.models.schemas import CaseResponse,DraftResponse, LegalSection
 
 logger = logging.getLogger(__name__)
 
@@ -15,39 +15,66 @@ class LegalAnalysisService:
         # for converting caseResponse in JSON.
         schema_instructions = CaseResponse.model_json_schema()
         
-        self.system_instruction = (
-            "You are an expert Indian criminal lawyer. Analyze the provided case facts and "
-            "determine all applicable charges under the Indian Penal Code (IPC). For every IPC "
-            "section identified, accurately map the corresponding section under the new "
-            "Bharatiya Nyaya Sanhita (BNS). Rely strictly on the provided text; do not invent facts. "
-            "You MUST respond ONLY in valid JSON that perfectly matches this schema: "
-            f"{json.dumps(schema_instructions)}"
+  
+
+    async def draft_summary(self, case_description: str) -> DraftResponse:
+        """PHASE 1: Reads the raw input and generates a clean title and summary."""
+        
+        prompt = f"""
+        You are an expert legal assistant. Read the following incident description.
+        1. Create a short, professional title for the case.
+        2. Write a clear, objective, one-sentence summary of the facts.
+        
+        Return ONLY valid JSON in this exact format:
+        {{
+            "title": "...",
+            "summary": "..."
+        }}
+        
+        Incident: {case_description}
+        """
+        
+        response = await self.client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile", # Or whichever Groq model you are using
+            response_format={"type": "json_object"}
         )
+        
+        result_dict = json.loads(response.choices[0].message.content)
+        return DraftResponse(**result_dict)
 
-    async def analyze_case(self, case_description: str) -> CaseResponse:
-        try:
-            # Here is where you actually ask the AI the question. You send two messages:
 
-            #  The system message: The strict rules you defined above (the actor's script).
-
-        #    The user message: The actual case facts the frontend sent you.
-            response = await self.client.chat.completions.create(
-                model=self.model_id,
-                messages=[
-                    {"role": "system", "content": self.system_instruction},
-                    {"role": "user", "content": f"Analyze the following incident facts: {case_description}"}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            
-            raw_json = response.choices[0].message.content
-            
-            if not raw_json:
-                raise ValueError("Received an empty response from Groq.")
-                
-            return CaseResponse.model_validate_json(raw_json)
-            
-        except Exception as e:
-            logger.error(f"Groq AI Analysis Error: {e}", exc_info=True)
-            raise Exception("Failed to perform legal analysis due to an internal AI error.")
+    async def extract_charges(self, approved_summary: str) -> list[LegalSection]:
+        """PHASE 2: Takes the HUMAN-VERIFIED summary and extracts penal charges."""
+        
+        prompt = f"""
+        You are an expert Indian criminal lawyer. Based on the verified facts below, 
+        identify the applicable Indian Penal Code (IPC) and Bharatiya Nyaya Sanhita (BNS) sections.
+        
+        Return ONLY valid JSON in this exact format, with a list of "charges":
+        {{
+            "charges": [
+                {{
+                    "ipc_section": "Section 378",
+                    "bns_equivalent": "Section 303(2)",
+                    "offense": "Theft",
+                    "explanation": "Brief reason..."
+                }}
+            ]
+        }}
+        
+        Verified Facts: {approved_summary}
+        """
+        
+        response = await self.client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile", 
+            response_format={"type": "json_object"}
+        )
+        
+        result_dict = json.loads(response.choices[0].message.content)
+        
+        # Convert the raw dictionaries into your nice Pydantic models
+        return [LegalSection(**charge) for charge in result_dict.get("charges", [])]
+    
+    

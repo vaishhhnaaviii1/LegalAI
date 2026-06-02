@@ -1,15 +1,14 @@
 # coordinates database (crud),  AI (LegalAnalysisService), and  external web scraper (KanoonService).
 
-import traceback
+import traceback  #for tracing error 
 import uuid
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException,Query,status
 from sqlalchemy.ext.asyncio import AsyncSession
 from functools import lru_cache
-
 from app.db.database import get_session
 from app import crud
-from app.models.schemas import CaseRequest, CaseResponse, CaseRead
+from app.models.schemas import CaseRequest, CaseResponse, CaseRead, CaseApproveRequest
 from app.models.legal_case import LegalCase
 from app.models.legal_section import LegalSection
 from app.services.legal_service import LegalAnalysisService
@@ -29,80 +28,6 @@ def get_legal_service() -> LegalAnalysisService:
 def get_kanoon_service() -> KanoonService:
     """Dependency injection to reuse the Kanoon API service instance."""
     return KanoonService()
-
-# create and analyse
-@router.post(
-    "", # FIXED: This prevents the /cases/cases double URL
-    response_model=CaseResponse, 
-    status_code=status.HTTP_201_CREATED,
-    summary="Save a case to the database and run full legal analysis"
-)
-async def create_and_analyze_case(
-    request: CaseRequest,
-    db: AsyncSession = Depends(get_session),
-    legal_service: LegalAnalysisService = Depends(get_legal_service),
-    kanoon_service: KanoonService = Depends(get_kanoon_service)
-):
-    try:
-        # LOGIC STEP 1: Verify the user exists in the database
-        user = await crud.user.get(db, id=request.user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # LOGIC STEP 2: Save the "Pending" Case
-        db_case = LegalCase(
-            user_id=request.user_id,
-            title=request.title,
-            raw_description=request.case_description,
-            status="pending"
-        )
-        db.add(db_case)
-        await db.commit()
-        await db.refresh(db_case)
-
-        # LOGIC STEP 3: Run the AI Analysis
-        ai_result = await legal_service.analyze_case(case_description=request.case_description)
-
-        # LOGIC STEP 4: Update the database with the AI's summary
-        db_case.llm_summary = ai_result.case_summary
-        db_case.status = "completed"
-        db.add(db_case)
-
-        # LOGIC STEP 5: Save charges and fetch Kanoon precedents
-        if ai_result.applicable_charges:
-            for charge in ai_result.applicable_charges:
-                db_section = LegalSection(
-                    case_id=db_case.id,
-                    ipc_section=charge.ipc_section,
-                    bns_section=charge.bns_equivalent,
-                    reason=charge.explanation,
-                    source="LLM"
-                )
-                db.add(db_section)
-                
-            # Now that we have the charges, we build the query and call Kanoon
-            primary_charge = ai_result.applicable_charges[0].ipc_section
-            search_query = f'"{primary_charge}" AND "IPC"' 
-            cases = await kanoon_service.fetch_precedents(search_query=search_query)
-            ai_result.precedent_cases = cases
-            
-        # Commit all the new sections and case updates at once
-        await db.commit()
-        
-        return ai_result
-
-    except Exception as e:
-        # If anything fails, rollback the database to prevent corrupted data
-        await db.rollback()
-        # --- NEW: Force the terminal to print the exact error and line number ---
-        print("🚨 CRITICAL ERROR 🚨")
-        traceback.print_exc()
-        # Adding 'str(e)' helps you see the exact Python error in Swagger!
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Server Error: {str(e)}"
-        )
-    
 
 @router.get(
     "", 
@@ -135,6 +60,124 @@ async def get_user_cases(
 
     except Exception as e:
         print("🚨 FETCH ERROR 🚨")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Server Error: {str(e)}"
+        )
+    
+
+
+
+# ==========================================
+# PHASE 1: INTAKE & DRAFT SUMMARY
+# ==========================================
+@router.post(
+    "", 
+    response_model=CaseRead, # Returns the saved DB object
+    status_code=status.HTTP_201_CREATED,
+    summary="Phase 1: Draft case summary (Pending Review)"
+)
+async def create_draft_case(
+    request: CaseRequest,
+    db: AsyncSession = Depends(get_session),
+    legal_service: LegalAnalysisService = Depends(get_legal_service)
+):
+    try:
+        # 1. Verify user
+        user = await crud.user.get(db, id=request.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # 2. Call Groq ONLY for the summary and title
+        print("🚀 Calling Groq for Draft Summary...")
+        draft_result = await legal_service.draft_summary(case_description=request.case_description)
+
+        # 3. Save as "pending_review"
+        db_case = LegalCase(
+            user_id=request.user_id,
+            title=draft_result.title,
+            raw_description=request.case_description,
+            llm_summary=draft_result.summary,
+            status="pending_review"
+        )
+        db.add(db_case)
+        await db.commit()
+        await db.refresh(db_case)
+
+        return db_case
+
+    except Exception as e:
+        await db.rollback()
+        print("🚨 CRITICAL ERROR IN PHASE 1 🚨")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Server Error: {str(e)}"
+        )
+
+# ==========================================
+# PHASE 2: APPROVAL & LEGAL ANALYSIS
+# ==========================================
+@router.patch(
+    "/{case_id}/analyze", 
+    response_model=CaseResponse, # Returns the full analysis payload
+    status_code=status.HTTP_200_OK,
+    summary="Phase 2: Approve summary, extract charges, fetch Kanoon"
+)
+async def analyze_approved_case(
+    case_id: uuid.UUID,
+    request: CaseApproveRequest, # The payload containing the lawyer's edits
+    db: AsyncSession = Depends(get_session),
+    legal_service: LegalAnalysisService = Depends(get_legal_service),
+    kanoon_service: KanoonService = Depends(get_kanoon_service)
+):
+    try:
+        # 1. Fetch the pending case
+        db_case = await crud.legal_case.get(db, id=case_id)
+        if not db_case:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        # 2. Save the lawyer's approved summary
+        db_case.lawyer_approved_summary = request.lawyer_approved_summary
+        
+        # 3. Call Groq to extract charges based on the VERIFIED summary
+        print("🚀 Calling Groq for IPC Extraction...")
+        charges = await legal_service.extract_charges(approved_summary=request.lawyer_approved_summary)
+
+        # 4. Save charges to DB and fetch Precedents
+        precedents = []
+        if charges:
+            for charge in charges:
+                db_section = LegalSection(
+                    case_id=db_case.id,
+                    ipc_section=charge.ipc_section,
+                    bns_section=charge.bns_equivalent,
+                    reason=charge.explanation,
+                    source="LLM"
+                )
+                db.add(db_section)
+                
+            # Call Kanoon using the first identified charge
+            primary_charge = charges[0].ipc_section
+            search_query = f'"{primary_charge}" AND "IPC"' 
+            print("🚀 Calling Kanoon API...")
+            precedents = await kanoon_service.fetch_precedents(search_query=search_query)
+
+        # 5. Mark as completed and save everything
+        db_case.status = "completed"
+        await db.commit()
+
+        # 6. Format the final output to match CaseResponse
+        return CaseResponse(
+            case_summary=request.lawyer_approved_summary,
+            applicable_charges=charges,
+            precedent_cases=precedents
+        )
+
+    except Exception as e:
+        await db.rollback()
+        print("🚨 CRITICAL ERROR IN PHASE 2 🚨")
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

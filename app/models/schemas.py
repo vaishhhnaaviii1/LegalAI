@@ -8,20 +8,23 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from pydantic import BaseModel
 
+# NEW: This forces Pydantic to trim spaces before checking min_length
+model_config = {
+        "str_strip_whitespace": True
+    }
+
 # It is for accepting data from user
 class CaseRequest(BaseModel):
-    title: str = Field(
-        default="Untitled Case", 
-        description="The title of the legal case. Defaults to 'Untitled Case'."
-    )
     case_description: str = Field(
         ..., 
         min_length=10, 
-        description="The facts of the legal incident to be analyzed."
+        description="The facts of the legal incident to be analyzed.",
+        max_length=5000
     )
     user_id: uuid.UUID = Field(
         description="The UUID of the user creating this case."
     )
+    
 # It si embedded in case response and is used to define the shape of the data that the AI will return for each legal section it identifies.
 class LegalSection(BaseModel):
     ipc_section: str = Field(description="The applicable Indian Penal Code (IPC) section, e.g., 'Section 378'")
@@ -111,5 +114,18 @@ class CaseRead(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True  # This tells Pydantic to happily read database rows!
+class Config:
+    from_attributes = True  # This tells Pydantic to happily read database rows!
+
+
+class CaseApproveRequest(BaseModel):
+        lawyer_approved_summary: str = Field(
+        ..., 
+        min_length=10,
+        description="The final, human-verified summary of the case facts."
+    )
+
+ # (Also, if you haven't already, ensure you have a simple DraftResponse to hold the AI's first output)
+class DraftResponse(BaseModel):
+        title: str
+        summary: str
