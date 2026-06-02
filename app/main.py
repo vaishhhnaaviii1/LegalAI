@@ -1,7 +1,12 @@
+import os
+from dotenv import load_dotenv
+# FORCE LOAD THE ENVIRONMENT VARIABLES BEFORE ANYTHING ELSE
+load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import legal
+from app.api.routes import cases
 from app.db.database import init_db
 import contextlib
 import logging
@@ -41,6 +46,7 @@ def create_app() -> FastAPI:
 
     # Register the legal routing module
     app.include_router(legal.router, prefix="/api/v1")
+    app.include_router(cases.router, prefix="/api/v1")
 
     @app.get("/health", tags=["System"])
     async def health_check():

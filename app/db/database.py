@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
@@ -6,6 +8,12 @@ from app.core.config import settings
 import app.models
 # This file is the bridge between your Python code and your PostgreSQL database. It sets up the connection, defines how to create tables, and provides a way to get a database session for your API routes.
 # Create the async PostgreSQL engine
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL") 
+
+# ---> ADD THIS EXACT LINE <---
+print(f"🚨 DEBUG DATABASE_URL: '{DATABASE_URL}' 🚨")
 engine = create_async_engine(settings.DATABASE_URL, echo=True, future=True)
 
 async def init_db():

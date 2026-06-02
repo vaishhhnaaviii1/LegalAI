@@ -1,3 +1,5 @@
+# contains the business logic for the /legal/analyze endpoint, which combines AI analysis with real precedent cases from Indian Kanoon.
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from functools import lru_cache
 from app.models.schemas import CaseRequest, CaseResponse
