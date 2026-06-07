@@ -1,6 +1,7 @@
 import requests
-from app.core.config import settings
+import json
 
+from app.core.config import settings
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -13,16 +14,27 @@ def generate_case_summary(case_text: str):
     }
 
     prompt = f"""
-    Analyze this legal case.
+You are an Indian legal expert.
 
-    Give:
-    1. Summary
-    2. Possible IPC Sections
-    3. Legal reasoning
+Analyze the case and return ONLY valid JSON.
 
-    Case:
-    {case_text}
-    """
+Format:
+
+{{
+  "sections": [
+    {{
+      "section_code": "420",
+      "title": "Cheating",
+      "punishment": "Up to 7 years imprisonment",
+      "reason": "Why this section applies"
+    }}
+  ]
+}}
+
+Case:
+
+{case_text}
+"""
 
     payload = {
         "model": "openai/gpt-3.5-turbo",
@@ -42,4 +54,12 @@ def generate_case_summary(case_text: str):
 
     data = response.json()
 
-    return data["choices"][0]["message"]["content"]
+    print("\nFULL RESPONSE:\n")
+    print(data)
+
+    content = data["choices"][0]["message"]["content"]
+
+    print("\nRAW CONTENT:\n")
+    print(content)
+
+    return json.loads(content)

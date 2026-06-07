@@ -3,7 +3,8 @@ from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
 import requests
-
+from app.services.ai_service import generate_case_summary
+from app.serializers.ipc_serializer import IPCResponse
 from app.db.database import get_session
 from app.models.case_model import Case, CaseCreate
 from app.models.ipc_model import IPCSection
@@ -24,6 +25,50 @@ def create_case(
     case: CaseCreate,
     session: Session = Depends(get_session)
 ):
+
+    new_case = Case(
+        title=case.title,
+        description=case.description
+    )
+
+    session.add(new_case)
+    session.commit()
+    session.refresh(new_case)
+
+    ai_result = generate_case_summary(
+        case.description
+    )
+
+    validated_response = IPCResponse.model_validate(
+        ai_result
+    )
+
+    saved_sections = []
+
+    for section in validated_response.sections:
+
+        ipc = IPCSection(
+            section_number=section.section_code,
+            title=section.title,
+            punishment=section.punishment,
+            reason=section.reason,
+            lawyer_decision=None,
+            case_id=new_case.id
+         )
+
+    session.add(ipc)
+
+    saved_sections.append({
+        "section_number": section.section_code,
+        "title": section.title
+    })
+
+    session.commit()
+
+    return {
+    "case_id": new_case.id,
+    "saved_sections": saved_sections
+}
 
     # ---------------------------------
     # CREATE MAIN CASE

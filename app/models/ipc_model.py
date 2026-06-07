@@ -1,8 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
-
-from app.models.case_model import Case
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.case_model import Case
@@ -14,8 +11,14 @@ class IPCSection(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     section_number: str
+
     title: str
+
     punishment: str
+
+    reason: str
+
+    lawyer_decision: Optional[str] = None
 
     case_id: Optional[int] = Field(
         default=None,
