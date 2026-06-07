@@ -3,6 +3,7 @@ import json
 from groq import AsyncGroq
 from app.core.config import settings
 from app.models.schemas import CaseResponse,DraftResponse, LegalSection
+from app.decorators import with_api_retry
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class LegalAnalysisService:
         schema_instructions = CaseResponse.model_json_schema()
         
   
-
+    @with_api_retry
     async def draft_summary(self, case_description: str) -> DraftResponse:
         """PHASE 1: Reads the raw input and generates a clean title and summary."""
         
@@ -43,7 +44,7 @@ class LegalAnalysisService:
         result_dict = json.loads(response.choices[0].message.content)
         return DraftResponse(**result_dict)
 
-
+    @with_api_retry
     async def extract_charges(self, approved_summary: str) -> list[LegalSection]:
         """PHASE 2: Takes the HUMAN-VERIFIED summary and extracts penal charges."""
         

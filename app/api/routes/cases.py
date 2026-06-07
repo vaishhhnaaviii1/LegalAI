@@ -3,7 +3,7 @@
 import traceback  #for tracing error 
 from uuid import UUID
 from typing import List
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.api.dependencies import get_db_session, get_legal_service, get_kanoon_service
 from app.errors import user_not_found_exc, case_not_found_exc, server_error_exc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -318,6 +318,15 @@ async def fetch_and_store_precedents(
         )
         result = await db.execute(query)
         approved_db_charges = result.scalars().all()
+         # ==========================================
+        # 🚨 NEW: THE GUARDRAIL
+        # ==========================================
+        if not approved_db_charges:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Action denied: The lawyer must approve at least one IPC section before fetching precedents."
+            )
+        # ==========================================
 
         precedents = []
         approved_sections = [charge.ipc_section for charge in approved_db_charges]

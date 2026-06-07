@@ -2,6 +2,7 @@ import httpx #This is a library used to make network requests,perfect for FastAP
 import logging
 from app.core.config import settings
 from app.models.schemas import ReferenceCase
+from app.decorators import with_api_retry
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class KanoonService:
             "Authorization": auth_header,
             "Accept": "application/json"
         }
-
+    @with_api_retry
     async def fetch_precedents(self, search_query: str, max_results: int = 3) -> list[ReferenceCase]:
         # Clean the query slightly (remove "Section" and quotes)
         clean_query = search_query.replace('"', '').replace('Section', '').strip()

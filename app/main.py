@@ -10,6 +10,10 @@ from app.api.routes import cases
 from app.db.database import init_db
 import contextlib
 import logging
+from app.core.logging_config import setup_logging
+from app.middleware.logging import APILoggingMiddleware
+
+setup_logging()
 
 # This turns on Python’s internal messaging system. Instead of using print(), professional apps use logger.
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +47,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
+    app.add_middleware(APILoggingMiddleware)
+    
     # Register the legal routing module
     app.include_router(legal.router, prefix="/api/v1")
     app.include_router(cases.router, prefix="/api/v1")
