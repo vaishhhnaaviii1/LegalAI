@@ -1,7 +1,7 @@
 import httpx #This is a library used to make network requests,perfect for FastAPI because it supports async
 import logging
 from app.core.config import settings
-from app.models.schemas import ReferenceCase
+from app.schemas.precedent import ReferenceCase
 from app.decorators import with_api_retry
 
 logger = logging.getLogger(__name__)

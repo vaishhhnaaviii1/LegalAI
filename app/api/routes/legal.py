@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, status
 from app.api.dependencies import get_legal_service, get_kanoon_service
 from app.errors import server_error_exc
-from app.models.schemas import CaseRequest, CaseResponse
+from app.schemas.case import CaseRequest, CaseResponse
 from app.services.legal_service import LegalAnalysisService
 from app.services.kanoon_service import KanoonService  # <-- NEW: Import the Kanoon Service
 

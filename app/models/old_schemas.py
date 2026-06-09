@@ -192,3 +192,14 @@ class NewChargeRequest(BaseModel):
     bns_section: str
     reason: str
 
+# Authorisation 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: str
+    name: str
+    email: str

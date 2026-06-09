@@ -7,10 +7,12 @@ from app.models.base import BaseModel
 
 
 
+
 # Prevent Circular Imports! This allows us to reference the User and LegalSection models without importing them at the top level, which would cause a circular import error.
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.legal_section import LegalSection
+    from app.models.precedent import PrecedentCase
 
 class LegalCase(BaseModel, table=True):
     # Foreign Key now points to a UUID

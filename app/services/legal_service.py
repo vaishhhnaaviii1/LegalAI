@@ -2,7 +2,8 @@ import logging
 import json
 from groq import AsyncGroq
 from app.core.config import settings
-from app.models.schemas import CaseResponse,DraftResponse, LegalSection
+from app.schemas.case import CaseResponse, DraftResponse
+from app.schemas.section import LegalSection
 from app.decorators import with_api_retry
 
 logger = logging.getLogger(__name__)

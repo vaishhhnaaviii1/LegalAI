@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from app.crud.base import CRUDBase
 from app.models.legal_case import LegalCase
-from app.models.schemas import CaseRequest 
+from app.schemas.case import CaseRequest 
 
 # 2. Add a quick placeholder for updates so the Generic base class is happy
 class CaseUpdate(BaseModel):
