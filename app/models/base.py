@@ -30,6 +30,6 @@ class BaseModel(SQLModel):
     is_deleted: bool = Field(default=False, index=True)
 
     deleted_at: datetime | None = Field(
-        default=None,
+        default_factory=get_utc_now,
         nullable=True
     )

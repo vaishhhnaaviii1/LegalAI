@@ -650,27 +650,22 @@ async def delete_case(
 ):
     return await case_controller.delete_case_controller(case_id, db)
 
-
-
 # ==========================================
 # GET ALL CASES (LIST VIEW)
 # ==========================================
 @router.get(
-    "/", 
-    response_model=List[CaseListRead], # <--- CHANGED: Now uses the lightweight List schema
+    "/",  
+    response_model=list[CaseListRead], 
     status_code=status.HTTP_200_OK,
     summary="Fetch all cases for a specific user (Dashboard View)"
 )
 async def get_user_cases(
-    user_id: UUID, # Requires the client to pass the user ID in the URL
-    # NEW: Add the search query parameter. Default is None if they aren't searching.
+    user_id: UUID, 
     search: str | None = Query(None, description="Search by case title or description"),
     skip: int = Query(0, ge=0, description="How many records to skip"),
     limit: int = Query(100, ge=1, le=100, description="How many records to return"),
     db: AsyncSession = Depends(get_db_session)
 ):
-    # Because you set response_model=List[CaseListRead], 
-    # FastAPI will automatically format the raw database objects into secure JSON!
     return await case_controller.get_user_cases_controller(user_id, search, skip, limit, db)
 
 
@@ -679,7 +674,7 @@ async def get_user_cases(
 # ==========================================
 @router.get(
     "/{case_id}", 
-    response_model=CaseDetailRead, # <--- NEW: Uses the heavy Detailed schema
+    response_model=CaseDetailRead, 
     status_code=status.HTTP_200_OK,
     summary="Fetch full case details including sections and precedents"
 )
@@ -687,7 +682,4 @@ async def get_case_details(
     case_id: UUID, 
     db: AsyncSession = Depends(get_db_session)
 ):
-    # This fetches the case, the charges, and the precedents all at once!
     return await case_controller.get_case_details_controller(case_id, db)
-
-# ... (keep all your other Phase 1, 2, 3 routes below this) ...

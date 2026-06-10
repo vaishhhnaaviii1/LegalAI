@@ -1,9 +1,11 @@
+import datetime
+from time import timezone
 import traceback
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 
 from app import crud
 from app.errors import user_not_found_exc, case_not_found_exc, server_error_exc
@@ -49,6 +51,7 @@ async def create_draft_case_controller(request: CaseRequest, db: AsyncSession, l
 
         # 3. Save as "pending_review"
         db_case = LegalCase(
+             # Generate a new UUID for the case
             user_id=request.user_id,
             title=draft_result.title,
             raw_description=request.case_description,
@@ -329,7 +332,6 @@ async def get_case_precedents_controller(case_id: UUID, db: AsyncSession):
         traceback.print_exc()
         raise server_error_exc(e)
 
-
 async def delete_case_controller(case_id: UUID, db: AsyncSession):
     try:
         # 1. Fetch the case (Ensuring it isn't already deleted)
@@ -341,42 +343,35 @@ async def delete_case_controller(case_id: UUID, db: AsyncSession):
         db_case = result.scalar_one_or_none()
 
         if not db_case:
-            # If it's None, it either never existed or is already deleted
             raise case_not_found_exc() 
+        
+        
 
         # 2. Soft delete the parent case
         db_case.is_deleted = True
-        db.add(db_case)
-
-        # 3. CASCADE: Soft delete all associated IPC sections 
-        # (This prevents orphaned charges from showing up in global searches)
-        sections_query = select(LegalSection).where(
-            LegalSection.case_id == case_id,
-            LegalSection.is_deleted == False
+        
+        # 3. CASCADE: Soft delete all associated IPC sections efficiently
+        # This bulk update is faster and ignores the NULL/False trap
+        await db.execute(
+            update(LegalSection)
+            .where(LegalSection.case_id == case_id)
+            .values(
+                is_deleted=True
+            )
         )
-        sections_result = await db.execute(sections_query)
-        associated_sections = sections_result.scalars().all()
-
-        for section in associated_sections:
-            section.is_deleted = True
-            db.add(section)
-
-        # Note: If you also added `is_deleted` to `PrecedentCase`, 
-        # you would run a similar loop for them here!
 
         # 4. Commit the changes
         await db.commit()
 
         return {"message": "Case and associated data successfully deleted."}
+        
     except HTTPException:
-        # Catch our 404 so it doesn't get converted to a 500 server error
         raise
     except Exception as e:
         await db.rollback()
         print("🚨 CRITICAL ERROR DURING CASE DELETION 🚨")
         traceback.print_exc()
         raise server_error_exc(e)
-    
 
 
 
@@ -477,4 +472,53 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
         raise server_error_exc(e)
 
     
+async def get_case_details_controller(case_id: UUID, db: AsyncSession):
+    try:
+        # 1. Fetch the main case
+        db_case = await crud.legal_case.get(db, id=case_id)
+        if not db_case:
+            raise case_not_found_exc()
 
+        # 2. Fetch all associated charges (sections)
+        query_sec = select(LegalSection).where(LegalSection.case_id == case_id)
+        sections_result = await db.execute(query_sec)
+        sections = sections_result.scalars().all()
+
+        # 3. Fetch all associated precedent cases
+        query_prec = select(PrecedentCase).where(PrecedentCase.case_id == case_id)
+        prec_result = await db.execute(query_prec)
+        precedents = prec_result.scalars().all()
+
+        # 4. Stitch them all together into a dictionary that perfectly matches CaseDetailRead
+        return {
+            "id": db_case.id,
+            "title": db_case.title,
+            "raw_description": db_case.raw_description,
+            "llm_summary": db_case.llm_summary,
+            "lawyer_approved_summary": db_case.lawyer_approved_summary,
+            "status": db_case.status,
+            "applicable_charges": [
+                {
+                    "id": sec.id,
+                    "ipc_section": sec.ipc_section,
+                    "bns_equivalent": sec.bns_section,
+                    "explanation": sec.reason,
+                    "is_approved": sec.is_approved
+                } for sec in sections
+            ],
+            "precedent_cases": [
+                {
+                    "id": p.id,
+                    "title": p.title,
+                    "doc_id": p.doc_id,
+                    "doc_url": p.doc_url,
+                    "ai_score": p.ai_score
+                } for p in precedents
+            ]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("🚨 ERROR FETCHING CASE DETAILS 🚨")
+        traceback.print_exc()
+        raise server_error_exc(e)

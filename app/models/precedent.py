@@ -15,13 +15,13 @@ class PrecedentCase(BaseModel, table=True):
     
     # 4. The SQLAlchemy Relationship back to the parent
     parent_case: Optional["LegalCase"] = Relationship(back_populates="precedents")
-
+    ai_score: float | None = Field(
+        default=None,
+        description="The AI-generated relevance score for this precedent"
+)
 if TYPE_CHECKING:
     # import for type checking / linters to recognize the model
     from app.models.legal_case import LegalCase
 
-    ai_score: float | None = Field(
-        default=None,
-        description="The AI-generated relevance score for this precedent"
-    )
+
 
