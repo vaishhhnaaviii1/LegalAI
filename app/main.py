@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("⏳ Initializing PostgreSQL Database...")
-    # await init_db()
-    # logger.info("✅ Database tables created successfully!")
+    await init_db()
+    logger.info("✅ Database tables created successfully!") ######these were uncommented
     yield
     logger.info("🛑 Server shutting down...")
 # This code guarantees that PostgreSQL is fully connected and 
@@ -40,13 +40,19 @@ def create_app() -> FastAPI:
     )
 
     # Standard security middleware for frontend communication
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Restrict this to your actual frontend domain in production
+        allow_origins=[
+            "http://localhost:5173", 
+            "http://127.0.0.1:5173", 
+            "http://localhost:3000"
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
     app.add_middleware(APILoggingMiddleware)
     
     # Register the legal routing module
