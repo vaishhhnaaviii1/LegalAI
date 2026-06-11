@@ -28,4 +28,6 @@ def invalid_payload_message() -> str:
 
 
 def invalid_payload_exc(detail: str | None = None) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail or INVALID_PAYLOAD)
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, detail=detail or INVALID_PAYLOAD
+    )

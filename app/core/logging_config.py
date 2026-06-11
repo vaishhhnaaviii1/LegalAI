@@ -1,7 +1,8 @@
 import logging
 import sys
 from pathlib import Path
-from logging.handlers import RotatingFileHandler # <--- 1. Import this
+from logging.handlers import RotatingFileHandler  # <--- 1. Import this
+
 
 def setup_logging():
     # Ensure a logs directory exists
@@ -16,10 +17,10 @@ def setup_logging():
 
     # 1. Rotating File Handler (Keeps up to 3 backup files, max 5MB each)
     file_handler = RotatingFileHandler(
-        filename=log_file, 
+        filename=log_file,
         maxBytes=5 * 1024 * 1024,  # 5 MB
-        backupCount=3,             # Keep 3 older files
-        encoding="utf-8"
+        backupCount=3,  # Keep 3 older files
+        encoding="utf-8",
     )
     file_handler.setFormatter(log_format)
     file_handler.setLevel(logging.INFO)
@@ -32,7 +33,7 @@ def setup_logging():
     # 3. Configure the Root Logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
-    
+
     # Avoid adding handlers multiple times if imported twice
     if not root_logger.handlers:
         root_logger.addHandler(file_handler)

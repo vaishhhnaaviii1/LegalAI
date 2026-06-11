@@ -17,10 +17,15 @@ from app.models.precedent import PrecedentCase
 from app.services.legal_service import LegalAnalysisService
 from app.services.kanoon_service import KanoonService
 
-async def get_user_cases_controller(user_id: UUID, search: str | None, skip: int, limit: int, db: AsyncSession):
+
+async def get_user_cases_controller(
+    user_id: UUID, search: str | None, skip: int, limit: int, db: AsyncSession
+):
     try:
         # LOGIC STEP 1: Verify the user actually exists
-        user = await crud.user.get(db, id=user_id)  # TODO: will be authorised by the authentication Decorator
+        user = await crud.user.get(
+            db, id=user_id
+        )  # TODO: will be authorised by the authentication Decorator
         if not user:
             raise user_not_found_exc()
 
@@ -35,10 +40,9 @@ async def get_user_cases_controller(user_id: UUID, search: str | None, skip: int
         raise server_error_exc(e)
 
 
-
-
-
-async def create_draft_case_controller(request: CaseRequest, db: AsyncSession, legal_service: LegalAnalysisService):
+async def create_draft_case_controller(
+    request: CaseRequest, db: AsyncSession, legal_service: LegalAnalysisService
+):
     try:
         # 1. Verify user
         user = await crud.user.get(db, id=request.user_id)
@@ -47,16 +51,18 @@ async def create_draft_case_controller(request: CaseRequest, db: AsyncSession, l
 
         # 2. Call Groq ONLY for the summary and title
         print("🚀 Calling Groq for Draft Summary...")
-        draft_result = await legal_service.draft_summary(case_description=request.case_description)
+        draft_result = await legal_service.draft_summary(
+            case_description=request.case_description
+        )
 
         # 3. Save as "pending_review"
         db_case = LegalCase(
-             # Generate a new UUID for the case
+            # Generate a new UUID for the case
             user_id=request.user_id,
             title=draft_result.title,
             raw_description=request.case_description,
             llm_summary=draft_result.summary,
-            status="pending_review"
+            status="pending_review",
         )
         db.add(db_case)
         await db.commit()
@@ -70,7 +76,12 @@ async def create_draft_case_controller(request: CaseRequest, db: AsyncSession, l
         raise server_error_exc(e)
 
 
-async def approve_summary_and_extract_controller(case_id: UUID, request: CaseSummaryApproveRequest, db: AsyncSession, legal_service: LegalAnalysisService):
+async def approve_summary_and_extract_controller(
+    case_id: UUID,
+    request: CaseSummaryApproveRequest,
+    db: AsyncSession,
+    legal_service: LegalAnalysisService,
+):
     try:
         # 1. Fetch case
         db_case = await crud.legal_case.get(db, id=case_id)
@@ -79,10 +90,12 @@ async def approve_summary_and_extract_controller(case_id: UUID, request: CaseSum
 
         # 2. Save the lawyer's approved summary
         db_case.lawyer_approved_summary = request.lawyer_approved_summary
-        
+
         # 3. Call Groq to extract charges
         print("🚀 Calling Groq for IPC Extraction...")
-        charges = await legal_service.extract_charges(approved_summary=request.lawyer_approved_summary)
+        charges = await legal_service.extract_charges(
+            approved_summary=request.lawyer_approved_summary
+        )
 
         # 4. Save DRAFT charges to DB
         if charges:
@@ -92,7 +105,7 @@ async def approve_summary_and_extract_controller(case_id: UUID, request: CaseSum
                     ipc_section=charge.ipc_section,
                     bns_section=charge.bns_equivalent,
                     reason=charge.explanation,
-                    source="LLM"
+                    source="LLM",
                 )
                 db.add(db_section)
 
@@ -108,7 +121,9 @@ async def approve_summary_and_extract_controller(case_id: UUID, request: CaseSum
         raise server_error_exc(e)
 
 
-async def add_manual_charge_controller(case_id: UUID, request: NewChargeRequest, db: AsyncSession):
+async def add_manual_charge_controller(
+    case_id: UUID, request: NewChargeRequest, db: AsyncSession
+):
     try:
         db_case = await crud.legal_case.get(db, id=case_id)
         if not db_case:
@@ -121,10 +136,10 @@ async def add_manual_charge_controller(case_id: UUID, request: NewChargeRequest,
             bns_section=request.bns_section,
             reason=request.reason,
             source="LAWYER_MANUAL",
-            is_approved=True, # It's manual, so it starts approved
-            has_lawyer_verified=True
+            is_approved=True,  # It's manual, so it starts approved
+            has_lawyer_verified=True,
         )
-        
+
         db.add(new_charge)
         await db.commit()
         await db.refresh(new_charge)
@@ -136,8 +151,8 @@ async def add_manual_charge_controller(case_id: UUID, request: NewChargeRequest,
                 "ipc_section": new_charge.ipc_section,
                 "bns_equivalent": new_charge.bns_section,
                 "explanation": new_charge.reason,
-                "is_approved": new_charge.is_approved
-            }
+                "is_approved": new_charge.is_approved,
+            },
         }
     except Exception as e:
         await db.rollback()
@@ -145,7 +160,9 @@ async def add_manual_charge_controller(case_id: UUID, request: NewChargeRequest,
         raise server_error_exc(e)
 
 
-async def finalize_charges_status_controller(case_id: UUID, request: ChargesActionRequest, db: AsyncSession):
+async def finalize_charges_status_controller(
+    case_id: UUID, request: ChargesActionRequest, db: AsyncSession
+):
     try:
         db_case = await crud.legal_case.get(db, id=case_id)
         if not db_case:
@@ -196,17 +213,17 @@ async def finalize_charges_status_controller(case_id: UUID, request: ChargesActi
             {
                 "id": charge.id,
                 "ipc_section": charge.ipc_section,
-                "bns_equivalent": charge.bns_section, 
-                "offense": "Refer to IPC",            
-                "explanation": charge.reason,         
-                "is_approved": charge.is_approved
-            } 
+                "bns_equivalent": charge.bns_section,
+                "offense": "Refer to IPC",
+                "explanation": charge.reason,
+                "is_approved": charge.is_approved,
+            }
             for charge in final_db_charges
         ]
 
         return {
             "message": "Charges successfully locked and verified by lawyer.",
-            "applicable_charges": clean_charges
+            "applicable_charges": clean_charges,
         }
     except Exception as e:
         await db.rollback()
@@ -215,7 +232,9 @@ async def finalize_charges_status_controller(case_id: UUID, request: ChargesActi
         raise server_error_exc(e)
 
 
-async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession, kanoon_service: KanoonService):
+async def fetch_and_store_precedents_controller(
+    case_id: UUID, db: AsyncSession, kanoon_service: KanoonService
+):
     try:
         db_case = await crud.legal_case.get(db, id=case_id)
         if not db_case:
@@ -223,19 +242,18 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
 
         # 1. Gather ONLY the charges that are actively set to true in the database
         query = select(LegalSection).where(
-            LegalSection.case_id == case_id,
-            LegalSection.is_approved == True
+            LegalSection.case_id == case_id, LegalSection.is_approved == True
         )
         result = await db.execute(query)
         approved_db_charges = result.scalars().all()
-        
+
         # ==========================================
         # 🚨 NEW: THE GUARDRAIL
         # ==========================================
         if not approved_db_charges:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Action denied: The lawyer must approve at least one IPC section before fetching precedents."
+                detail="Action denied: The lawyer must approve at least one IPC section before fetching precedents.",
             )
         # ==========================================
 
@@ -249,23 +267,29 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
             combined_sections = " AND ".join([f'"{sec}"' for sec in top_sections])
             search_query = f'({combined_sections}) AND "IPC"'
 
-            print(f"🚀 Calling Kanoon API for compound logic criteria: {search_query}...")
-            kanoon_results = await kanoon_service.fetch_precedents(search_query=search_query)
+            print(
+                f"🚀 Calling Kanoon API for compound logic criteria: {search_query}..."
+            )
+            kanoon_results = await kanoon_service.fetch_precedents(
+                search_query=search_query
+            )
 
             # Clear out existing relational rows to prevent duplicates if recalculated
-            await db.execute(delete(PrecedentCase).where(PrecedentCase.case_id == case_id))
+            await db.execute(
+                delete(PrecedentCase).where(PrecedentCase.case_id == case_id)
+            )
 
             # 3. Save each incoming record item into a separate database row
             for item in kanoon_results:
-               # Use DOT NOTATION here instead of brackets!
+                # Use DOT NOTATION here instead of brackets!
                 kanoon_url = f"https://indiankanoon.org/doc/{item.doc_id}/"
-                
+
                 new_precedent = PrecedentCase(
                     case_id=db_case.id,
-                    title=item.title,        # <--- Changed from item["title"]
+                    title=item.title,  # <--- Changed from item["title"]
                     doc_id=item.doc_id,
                     doc_url=kanoon_url,
-                    ai_score=None # Ready for custom re-ranking models
+                    ai_score=None,  # Ready for custom re-ranking models
                 )
                 db.add(new_precedent)
                 precedents.append(new_precedent)
@@ -279,11 +303,11 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
             {
                 "id": charge.id,
                 "ipc_section": charge.ipc_section,
-                "bns_equivalent": charge.bns_section, 
-                "offense": "Refer to IPC",            
-                "explanation": charge.reason,         
-                "is_approved": charge.is_approved
-            } 
+                "bns_equivalent": charge.bns_section,
+                "offense": "Refer to IPC",
+                "explanation": charge.reason,
+                "is_approved": charge.is_approved,
+            }
             for charge in approved_db_charges
         ]
 
@@ -294,7 +318,7 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
                 "title": p.title,
                 "doc_id": p.doc_id,
                 "doc_url": p.doc_url,
-                "ai_score": p.ai_score
+                "ai_score": p.ai_score,
             }
             for p in precedents
         ]
@@ -302,7 +326,7 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
         return CaseResponse(
             case_summary=db_case.lawyer_approved_summary,
             applicable_charges=clean_charges,
-            precedent_cases=clean_precedents
+            precedent_cases=clean_precedents,
         )
     except Exception as e:
         await db.rollback()
@@ -332,39 +356,35 @@ async def get_case_precedents_controller(case_id: UUID, db: AsyncSession):
         traceback.print_exc()
         raise server_error_exc(e)
 
+
 async def delete_case_controller(case_id: UUID, db: AsyncSession):
     try:
         # 1. Fetch the case (Ensuring it isn't already deleted)
         query = select(LegalCase).where(
-            LegalCase.id == case_id, 
-            LegalCase.is_deleted == False
+            LegalCase.id == case_id, LegalCase.is_deleted == False
         )
         result = await db.execute(query)
         db_case = result.scalar_one_or_none()
 
         if not db_case:
-            raise case_not_found_exc() 
-        
-        
+            raise case_not_found_exc()
 
         # 2. Soft delete the parent case
         db_case.is_deleted = True
-        
+
         # 3. CASCADE: Soft delete all associated IPC sections efficiently
         # This bulk update is faster and ignores the NULL/False trap
         await db.execute(
             update(LegalSection)
             .where(LegalSection.case_id == case_id)
-            .values(
-                is_deleted=True
-            )
+            .values(is_deleted=True)
         )
 
         # 4. Commit the changes
         await db.commit()
 
         return {"message": "Case and associated data successfully deleted."}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -374,9 +394,9 @@ async def delete_case_controller(case_id: UUID, db: AsyncSession):
         raise server_error_exc(e)
 
 
-
-
-async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession, kanoon_service: KanoonService):
+async def fetch_and_store_precedents_controller(
+    case_id: UUID, db: AsyncSession, kanoon_service: KanoonService
+):
     try:
         db_case = await crud.legal_case.get(db, id=case_id)
         if not db_case:
@@ -384,19 +404,18 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
 
         # 1. Gather ONLY the charges that are actively set to true in the database
         query = select(LegalSection).where(
-            LegalSection.case_id == case_id,
-            LegalSection.is_approved == True
+            LegalSection.case_id == case_id, LegalSection.is_approved == True
         )
         result = await db.execute(query)
         approved_db_charges = result.scalars().all()
-        
+
         # ==========================================
         # 🚨 NEW: THE GUARDRAIL
         # ==========================================
         if not approved_db_charges:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Action denied: The lawyer must approve at least one IPC section before fetching precedents."
+                detail="Action denied: The lawyer must approve at least one IPC section before fetching precedents.",
             )
         # ==========================================
 
@@ -410,23 +429,29 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
             combined_sections = " AND ".join([f'"{sec}"' for sec in top_sections])
             search_query = f'({combined_sections}) AND "IPC"'
 
-            print(f"🚀 Calling Kanoon API for compound logic criteria: {search_query}...")
-            kanoon_results = await kanoon_service.fetch_precedents(search_query=search_query)
+            print(
+                f"🚀 Calling Kanoon API for compound logic criteria: {search_query}..."
+            )
+            kanoon_results = await kanoon_service.fetch_precedents(
+                search_query=search_query
+            )
 
             # Clear out existing relational rows to prevent duplicates if recalculated
-            await db.execute(delete(PrecedentCase).where(PrecedentCase.case_id == case_id))
+            await db.execute(
+                delete(PrecedentCase).where(PrecedentCase.case_id == case_id)
+            )
 
             # 3. Save each incoming record item into a separate database row
             for item in kanoon_results:
-               # Use DOT NOTATION here instead of brackets!
+                # Use DOT NOTATION here instead of brackets!
                 kanoon_url = f"https://indiankanoon.org/doc/{item.doc_id}/"
-                
+
                 new_precedent = PrecedentCase(
                     case_id=db_case.id,
-                    title=item.title,        # <--- Changed from item["title"]
+                    title=item.title,  # <--- Changed from item["title"]
                     doc_id=item.doc_id,
                     doc_url=kanoon_url,
-                    ai_score=None # Ready for custom re-ranking models
+                    ai_score=None,  # Ready for custom re-ranking models
                 )
                 db.add(new_precedent)
                 precedents.append(new_precedent)
@@ -440,11 +465,11 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
             {
                 "id": charge.id,
                 "ipc_section": charge.ipc_section,
-                "bns_equivalent": charge.bns_section, 
-                "offense": "Refer to IPC",            
-                "explanation": charge.reason,         
-                "is_approved": charge.is_approved
-            } 
+                "bns_equivalent": charge.bns_section,
+                "offense": "Refer to IPC",
+                "explanation": charge.reason,
+                "is_approved": charge.is_approved,
+            }
             for charge in approved_db_charges
         ]
 
@@ -455,7 +480,7 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
                 "title": p.title,
                 "doc_id": p.doc_id,
                 "doc_url": p.doc_url,
-                "ai_score": p.ai_score
+                "ai_score": p.ai_score,
             }
             for p in precedents
         ]
@@ -463,7 +488,7 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
         return CaseResponse(
             case_summary=db_case.lawyer_approved_summary,
             applicable_charges=clean_charges,
-            precedent_cases=clean_precedents
+            precedent_cases=clean_precedents,
         )
     except Exception as e:
         await db.rollback()
@@ -471,7 +496,7 @@ async def fetch_and_store_precedents_controller(case_id: UUID, db: AsyncSession,
         traceback.print_exc()
         raise server_error_exc(e)
 
-    
+
 async def get_case_details_controller(case_id: UUID, db: AsyncSession):
     try:
         # 1. Fetch the main case
@@ -503,8 +528,9 @@ async def get_case_details_controller(case_id: UUID, db: AsyncSession):
                     "ipc_section": sec.ipc_section,
                     "bns_equivalent": sec.bns_section,
                     "explanation": sec.reason,
-                    "is_approved": sec.is_approved
-                } for sec in sections
+                    "is_approved": sec.is_approved,
+                }
+                for sec in sections
             ],
             "precedent_cases": [
                 {
@@ -512,9 +538,10 @@ async def get_case_details_controller(case_id: UUID, db: AsyncSession):
                     "title": p.title,
                     "doc_id": p.doc_id,
                     "doc_url": p.doc_url,
-                    "ai_score": p.ai_score
-                } for p in precedents
-            ]
+                    "ai_score": p.ai_score,
+                }
+                for p in precedents
+            ],
         }
     except HTTPException:
         raise

@@ -1,0 +1,16 @@
+[flake8]
+# Ignore the virtual environment, git, and cache folders
+exclude =
+    .git,
+    __pycache__,
+    venv,
+    env,
+    .venv
+
+# Modern standard line length (matches the 'Black' formatter)
+max-line-length = 88
+
+# Ignore specific rules that conflict with modern formatting
+extend-ignore = 
+    E203, # Whitespace before ':' (conflicts with Black)
+    W503  # Line break before binary operator

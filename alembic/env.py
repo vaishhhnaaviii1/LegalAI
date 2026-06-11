@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv, find_dotenv
+
 load_dotenv(find_dotenv())
 import asyncio
 from logging.config import fileConfig
@@ -8,13 +9,15 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
+
 # ==========================================
 # 1. IMPORT YOUR APP'S CONFIG AND MODELS
 # ==========================================
 from sqlmodel import SQLModel
 from app.core.config import settings
-import app.models# This forces SQLModel to read your tables!
+import app.models  # This forces SQLModel to read your tables!
 from app.models.precedent import PrecedentCase
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -29,7 +32,6 @@ safe_url = raw_url.replace("%", "%%")
 
 # Pass it to Alembic!
 config.set_main_option("sqlalchemy.url", safe_url)
-
 
 
 # Interpret the config file for Python logging.

@@ -13,6 +13,7 @@ def get_draft_summary_prompt(case_description: str) -> str:
         Incident: {case_description}
         """
 
+
 def get_charge_extraction_prompt(approved_summary: str) -> str:
     return f"""
         You are an expert Indian criminal lawyer. Based on the verified facts below, 
