@@ -1,0 +1,44 @@
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.local
+
+# =========================
+# Python Caches & Compiled
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# =========================
+# Virtual Environments
+# =========================
+venv/
+env/
+.venv/
+ENV/
+
+# =========================
+# Databases & Logs
+# =========================
+*.db
+*.sqlite3
+*.log
+
+# =========================
+# Build & Distribution
+# =========================
+build/
+dist/
+*.egg-info/
+*.egg
+
+# =========================
+# IDEs & OS Files
+# =========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
