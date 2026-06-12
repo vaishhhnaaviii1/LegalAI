@@ -35,6 +35,7 @@ print(f"🚨 FORCED ASYNC DATABASE_URL ROUTE: '{db_url}' 🚀")
 engine = create_async_engine(db_url, echo=True, future=True)
 
 
+
 async def init_db():
     """
     Creates all the tables in PostgreSQL when the server starts.

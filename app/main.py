@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
     )
 
     # Standard security middleware for frontend communication
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
     app.add_middleware(APILoggingMiddleware)
 
     # Register the legal routing module
