@@ -96,3 +96,13 @@ class LegalSection(BaseModel):
     explanation: str = Field(
         description="A brief, precise legal explanation of why this section applies to the provided facts."
     )
+
+class ChargeResponse(BaseModel):
+    id:UUID
+    ipc_section: str
+    bns_section: str
+    reason: str
+
+class ExtractChargesResponse(BaseModel):
+    message: str
+    draft_charges: list[ChargeResponse]

@@ -12,11 +12,27 @@ import app.models
 # Create the async PostgreSQL engine
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# DATABASE_URL = os.getenv("DATABASE_URL") 
 
-# ---> ADD THIS EXACT LINE <---
-print(f"DEBUG DATABASE_URL: '{DATABASE_URL}'")
-engine = create_async_engine(settings.DATABASE_URL, echo=True, future=True)
+# # ---> ADD THIS EXACT LINE <---
+# print(f"🚨 DEBUG DATABASE_URL: '{DATABASE_URL}' 🚨")
+# engine = create_async_engine(settings.DATABASE_URL, echo=True, future=True)
+
+# 1. Read the environment variable
+db_url = os.getenv("DATABASE_URL")
+
+# 2. Safety fallback: If it's missing from os.getenv, check settings
+if not db_url:
+    db_url = str(settings.DATABASE_URL)
+
+# 3. FORCE THE ASYNC DRIVER MANUALLY TO BYPASS MACHINE MEMORY GLITCHES
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+print(f"🚨 FORCED ASYNC DATABASE_URL ROUTE: '{db_url}' 🚀")
+
+# 4. Pass our newly fixed db_url string into the engine configuration
+engine = create_async_engine(db_url, echo=True, future=True)
 
 
 async def init_db():
