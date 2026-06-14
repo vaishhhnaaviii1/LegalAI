@@ -1,18 +1,38 @@
 def get_draft_summary_prompt(case_description: str) -> str:
     return f"""
-        You are an expert legal assistant. Read the following incident description.
-        1. Create a short, professional title for the case along with the names of parties (party A vs. Party B )  involved if mentioned in the description.
-        2. Write a clear, objective, one-sentence summary of the facts.
-        
-        Return ONLY valid JSON in this exact format:
-        {{
-            "title": "...(... vs. ...)",
-            "summary": "..."
-        }}
-        
-        Incident: {case_description}
-        """
+You are an expert legal assistant.
 
+Read the following incident description and:
+
+1. Generate a short, professional case title (5-10 words) that captures the core dispute or incident.
+2. If party names are mentioned, append them in the format:
+   "<Case Title> (Party A vs. Party B)"
+3. If only one party or no parties are mentioned, create the title based on the incident alone.
+4. Generate a factual case summary that:
+   - Is objective and legally neutral.
+   - Preserves all important facts, events, dates, amounts, locations, and actions.
+   - Does not add assumptions or legal conclusions.
+   - Is approximately 80-120 words long.
+   - Reads like a professional case brief prepared for a lawyer.
+   - Uses 3-5 complete sentences instead of a single sentence.
+
+Return ONLY valid JSON:
+
+{{
+    "title": "...",
+    "summary": "..."
+}}
+
+Example:
+
+{{
+    "title": "Advance Payment Fraud Dispute (Amit Sharma vs. Rajesh Gupta)",
+    "summary": "According to the complaint, Amit Sharma placed an order for machinery from Rajesh Gupta and paid an advance amount of ₹15 lakh. The accused allegedly assured timely delivery but repeatedly postponed fulfillment while continuing to represent that the order was being processed. Despite multiple follow-ups and demands, the machinery was not delivered and the advance payment was not refunded. The complainant claims that the representations made at the time of the transaction were false and resulted in financial loss."
+}}
+
+Incident Description:
+{case_description}
+"""
 
 def get_charge_extraction_prompt(approved_summary: str) -> str:
     return f"""
