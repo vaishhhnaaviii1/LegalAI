@@ -70,11 +70,12 @@ async def db_login(request: LoginRequest, db: AsyncSession = Depends(get_db_sess
     # 2. Verify the user exists AND the password matches
     # NOTE: We are doing a direct string comparison here because you
     # haven't added password hashing yet. This is perfect for testing!
- if not db_user or db_user.password_hash != request.password:
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Incorrect email or password",
-    )
+    if not db_user or db_user.password_hash != request.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+
     # 3. Check if the account was soft-deleted or deactivated
     if not db_user.is_active or db_user.is_deleted:
         raise HTTPException(
