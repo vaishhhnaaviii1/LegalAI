@@ -18,7 +18,10 @@ async def get_case_details_controller(case_id: UUID, db: AsyncSession):
             raise case_not_found_exc()
 
         # 2. Fetch all associated charges (sections)
-        query_sec = select(LegalSection).where(LegalSection.case_id == case_id)
+        query_sec = select(LegalSection).where(
+       LegalSection.case_id == case_id,
+       LegalSection.is_approved == True
+)
         sections_result = await db.execute(query_sec)
         sections = sections_result.scalars().all()
 
