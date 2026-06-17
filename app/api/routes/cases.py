@@ -11,6 +11,7 @@ from app.api.routes.cases_get_precedents import router as get_precedents_router
 from app.api.routes.cases_delete import router as delete_router
 from app.api.routes.cases_get_details import router as get_details_router
 from app.api.routes.delete_legal_section import router as delete_legal_section_router
+from app.api.routes.cases_regenerate_summary import router as regenerate_summary_router
 router = APIRouter(prefix="/cases", tags=["Legal Cases"])
 
 # include child routers (they define their own handlers)
@@ -24,3 +25,4 @@ router.include_router(get_precedents_router)
 router.include_router(delete_router)
 router.include_router(get_details_router)
 router.include_router(delete_legal_section_router)
+router.include_router(regenerate_summary_router)
