@@ -113,3 +113,6 @@ class CaseRead(BaseModel):
 class DraftResponse(BaseModel):
     title: str
     summary: str
+
+class CaseRegenerateRequest(BaseModel):
+    description: str
