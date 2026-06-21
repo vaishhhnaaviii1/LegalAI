@@ -17,10 +17,12 @@ class LegalSection(BaseModel, table=True):
 
     # 1/0 Bool/Null as requested
     is_approved: bool | None = Field(default=None)
-
+    
     # Source: Lawyer or LLM
     source: str = Field(default="LLM")
     has_lawyer_verified: bool = Field(default=False)
 
+    rejection_reason: str | None = Field(default=None, description="Reason for rejection if the section is not approved")
+    
     # Relationship linking back to the Case
     legal_case: "LegalCase" = Relationship(back_populates="sections")
