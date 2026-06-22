@@ -1,4 +1,7 @@
 import os
+import json
+import boto3
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -8,33 +11,54 @@ from app.core.config import settings
 # This forces SQLModel to read your tables before building the database
 import app.models
 
-# This file is the bridge between your Python code and your PostgreSQL database. It sets up the connection, defines how to create tables, and provides a way to get a database session for your API routes.
-# Create the async PostgreSQL engine
+# Load local environment variables for fallback
 load_dotenv()
 
-# DATABASE_URL = os.getenv("DATABASE_URL") 
+def get_aws_secret():
+    """Fetches the database credentials securely from AWS Secrets Manager."""
+    secret_name = "legalai/prod/db"  # Dhyan rakhna AWS mein yahi naam banana hai
+    region_name = "eu-north-1"       # Tumhara AWS region
 
-# # ---> ADD THIS EXACT LINE <---
-# print(f"🚨 DEBUG DATABASE_URL: '{DATABASE_URL}' 🚨")
-# engine = create_async_engine(settings.DATABASE_URL, echo=True, future=True)
+    # AWS Secrets Manager client banao
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
 
-# 1. Read the environment variable
-db_url = os.getenv("DATABASE_URL")
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        print(f"⚠️ AWS Secrets Manager Fetch Failed: {e}")
+        return None
 
-# 2. Safety fallback: If it's missing from os.getenv, check settings
+    secret = get_secret_value_response['SecretString']
+    return json.loads(secret)
+
+# 1. Try to get DB URL from AWS Secrets Manager FIRST
+db_url = None
+aws_secrets = get_aws_secret()
+
+if aws_secrets and "DATABASE_URL" in aws_secrets:
+    db_url = aws_secrets["DATABASE_URL"]
+    print("✅ Successfully loaded Database URL from AWS Secrets Manager!")
+
+# 2. Safety fallback: If AWS fails or running locally, use .env or settings
+if not db_url:
+    print("⚠️ Falling back to local .env / settings for DATABASE_URL.")
+    db_url = os.getenv("DATABASE_URL")
+
 if not db_url:
     db_url = str(settings.DATABASE_URL)
 
 # 3. FORCE THE ASYNC DRIVER MANUALLY TO BYPASS MACHINE MEMORY GLITCHES
-if db_url.startswith("postgresql://"):
+if db_url and db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 print(f"🚨 FORCED ASYNC DATABASE_URL ROUTE: '{db_url}' 🚀")
 
 # 4. Pass our newly fixed db_url string into the engine configuration
 engine = create_async_engine(db_url, echo=True, future=True)
-
-
 
 async def init_db():
     """
@@ -45,7 +69,6 @@ async def init_db():
     async with engine.begin() as conn:
         # This reads db_models.py and generates the SQL CREATE TABLE commands
         await conn.run_sync(SQLModel.metadata.create_all)
-
 
 async def get_session() -> AsyncSession:
     """Dependency injection to get a database session for your routes."""
